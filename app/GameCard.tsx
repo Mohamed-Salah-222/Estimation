@@ -81,15 +81,14 @@ export default function GameCard({ game, onDelete, isDeleteMode, updatePlayerNam
   /**
    * Get total rounds based on game mode
    */
+  /**
+   * Get remaining rounds based on current round
+   */
   const getRoundsRemaining = () => {
-    switch (game.mode) {
-      case "mini":
-        return 10;
-      case "micro":
-        return 5;
-      default:
-        return 18; // classic
-    }
+    const totalRounds = game.calls.length; // Dynamic total (handles extra rounds too)
+    const currentRound = game.currentRound || 1;
+    const remaining = totalRounds - currentRound + 1;
+    return remaining > 0 ? remaining : 0;
   };
 
   /**
@@ -115,7 +114,7 @@ export default function GameCard({ game, onDelete, isDeleteMode, updatePlayerNam
   // ===== RENDER =====
   return (
     <>
-      <TouchableOpacity onPress={handleCardPress} style={[styles.gameCard, isDeleteMode && styles.deleteModeCard]} activeOpacity={0.8}>
+      <TouchableOpacity onPress={handleCardPress} style={[styles.gameCard, isDeleteMode && styles.deleteModeCard]} activeOpacity={0.8} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
         {/* Delete mode indicator overlay */}
         {/* TOP HALF - 4 Mini Sticky Notes with Player Names */}
         <View style={styles.topHalf}>

@@ -404,6 +404,17 @@ export default function GamePage() {
 
     if (actualRoundIndex < 0) return; // Safety check
 
+    // Check if this is the last round based on game mode
+    const maxRounds = currentGame.mode === "mini" ? 10 : currentGame.mode === "micro" ? 5 : 18; // classic = 18
+    const currentTotalRounds = currentGame.calls.length;
+    const isLastRound = actualRoundIndex + 1 === currentTotalRounds;
+
+    // If it's the last round (regardless of original max), add an extra round
+    if (isLastRound) {
+      addExtraRound(currentGame.id);
+    }
+
+    // Mark everyone as lost
     markEveryoneLost(currentGame.id, actualRoundIndex);
 
     // Move to next round
@@ -531,7 +542,7 @@ export default function GamePage() {
                       {editingPlayerName === index ? (
                         <TextInput style={styles.columnHeader} value={tempPlayerName} onChangeText={setTempPlayerName} onBlur={() => handleFinishEditingName(index)} placeholder={`Player ${index + 1}`} maxLength={15} autoFocus={true} />
                       ) : (
-                        <TouchableOpacity onPress={() => handleStartEditingName(index)}>
+                        <TouchableOpacity onPress={() => handleStartEditingName(index)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                           <Text style={styles.columnHeader} numberOfLines={1}>
                             {player}
                           </Text>
@@ -572,7 +583,7 @@ export default function GamePage() {
                     return (
                       <View key={`round-${roundIndex}`} style={styles.roundCell}>
                         {isPlayingLastRound ? (
-                          <TouchableOpacity onPress={() => handleEveryoneLost(roundIndex)}>
+                          <TouchableOpacity onPress={() => handleEveryoneLost(roundIndex)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                             <Foundation name="skull" size={24} color="black" />
                           </TouchableOpacity>
                         ) : (
@@ -618,12 +629,20 @@ export default function GamePage() {
                   return (
                     <View key={`round-${roundIndex}`} style={styles.roundCell}>
                       {isPlayingRow ? (
-                        <TouchableOpacity onPress={() => handleEveryoneLost(roundIndex)}>
+                        <TouchableOpacity onPress={() => handleEveryoneLost(roundIndex)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                           <Foundation name="skull" size={24} color="black" />
                         </TouchableOpacity>
                       ) : isPreviousRound ? (
-                        <TouchableOpacity onPress={() => handleUndoRound(roundIndex)}>
-                          <View style={styles.roundNumberCircle}>{mandatorySuit ? <Text style={[styles.mandatorySuitSymbol, { color: mandatorySuit.color }]}>{mandatorySuit.symbol}</Text> : <Text style={[styles.roundNumberInCircle, isStrikethrough && styles.strikethroughText]}>{roundNumber}</Text>}</View>
+                        <TouchableOpacity onPress={() => handleUndoRound(roundIndex)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                          {mandatorySuit ? (
+                            // Mandatory suit rounds (14-18): NO circle, just suit symbol
+                            <Text style={[styles.mandatorySuitSymbol, { color: mandatorySuit.color }]}>{mandatorySuit.symbol}</Text>
+                          ) : (
+                            // Normal rounds (1-13, 19+): Circle with number
+                            <View style={styles.roundNumberCircle}>
+                              <Text style={[styles.roundNumberInCircle, isStrikethrough && styles.strikethroughText]}>{roundNumber}</Text>
+                            </View>
+                          )}
                         </TouchableOpacity>
                       ) : mandatorySuit ? (
                         <Text style={[styles.mandatorySuitSymbol, { color: mandatorySuit.color }, isStrikethrough && styles.strikethroughText]}>{mandatorySuit.symbol}</Text>
@@ -653,11 +672,11 @@ export default function GamePage() {
                         <View key={`p${playerIndex}-sub1-${roundIndex}`} style={styles.subCell}>
                           {everyoneLostThisRound && <View style={styles.strikethrough} />}
                           {isCurrentRow && isPlayingRow ? (
-                            <TouchableOpacity onPress={() => openResultModal(roundIndex, playerIndex)}>
+                            <TouchableOpacity onPress={() => openResultModal(roundIndex, playerIndex)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                               <MaterialIcons name="cancel" size={24} color="red" />
                             </TouchableOpacity>
                           ) : isCurrentRow && !isPlayingRow ? (
-                            <TouchableOpacity onPress={() => handleDashCall(roundIndex, playerIndex)}>
+                            <TouchableOpacity onPress={() => handleDashCall(roundIndex, playerIndex)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                               <Text style={styles.actionText}>DC</Text>
                             </TouchableOpacity>
                           ) : isFinished ? (
@@ -682,7 +701,7 @@ export default function GamePage() {
                           {isCurrentRow && isPlayingRow ? (
                             <Text style={styles.subColumnData}>{currentGame.results[roundIndex][playerIndex] ?? "..."}</Text>
                           ) : isCurrentRow && !isPlayingRow ? (
-                            <TouchableOpacity onPress={() => openCallModal(roundIndex, playerIndex)}>
+                            <TouchableOpacity onPress={() => openCallModal(roundIndex, playerIndex)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                               <FontAwesome6 name="pencil" size={16} color="#333333" />
                             </TouchableOpacity>
                           ) : (
@@ -703,11 +722,11 @@ export default function GamePage() {
                         <View key={`p${playerIndex}-sub3-${roundIndex}`} style={styles.subCell}>
                           {currentGame.everyoneLost[roundIndex] && <View style={styles.strikethrough} />}
                           {isCurrentRow && isPlayingRow ? (
-                            <TouchableOpacity onPress={() => handleWinClick(roundIndex, playerIndex)}>
+                            <TouchableOpacity onPress={() => handleWinClick(roundIndex, playerIndex)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                               <FontAwesome name="check-circle" size={24} color="green" />
                             </TouchableOpacity>
                           ) : isCurrentRow && !isPlayingRow ? (
-                            <TouchableOpacity onPress={() => openCallerModal(roundIndex, playerIndex)}>
+                            <TouchableOpacity onPress={() => openCallerModal(roundIndex, playerIndex)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                               <Text style={styles.actionText}>C</Text>
                             </TouchableOpacity>
                           ) : (
@@ -763,8 +782,18 @@ export default function GamePage() {
                         }
                       }
 
-                      // Risk indicator text based on multiplier
-                      const riskIndicatorText = riskMultiplier > 1 ? `${riskMultiplier}R` : "R";
+                      // Determine indicator text based on conditions
+                      let indicatorText = "";
+                      if (isRisk && isWith) {
+                        // Both Risk and With
+                        indicatorText = riskMultiplier > 1 ? `${riskMultiplier}RW` : "RW";
+                      } else if (isRisk) {
+                        // Risk only
+                        indicatorText = riskMultiplier > 1 ? `${riskMultiplier}R` : "R";
+                      } else if (isWith) {
+                        // With only
+                        indicatorText = "W";
+                      }
 
                       const displayCall = isDC ? "DC" : call;
 
@@ -776,14 +805,9 @@ export default function GamePage() {
                               <Text style={[styles.suitSymbolInCall, { color: getSuitColor(callerSuit) }]}>{getSuitSymbol(callerSuit)}</Text>
                               <Text style={styles.subColumnData}>{displayCall}</Text>
                             </View>
-                          ) : isWith ? (
+                          ) : isRisk || isWith ? (
                             <View style={styles.callWithSuitContainer}>
-                              <Text style={styles.withIndicator}>W</Text>
-                              <Text style={styles.subColumnData}>{displayCall}</Text>
-                            </View>
-                          ) : isRisk ? (
-                            <View style={styles.callWithSuitContainer}>
-                              <Text style={styles.riskIndicator}>{riskIndicatorText}</Text>
+                              <Text style={styles.riskIndicator}>{indicatorText}</Text>
                               <Text style={styles.subColumnData}>{displayCall}</Text>
                             </View>
                           ) : (
@@ -811,7 +835,7 @@ export default function GamePage() {
                       return (
                         <View key={`diff-${roundIndex}`} style={styles.roundCell}>
                           {isPlayingLastRound ? (
-                            <TouchableOpacity disabled={isConfirmDisabled} onPress={handleConfirmRound}>
+                            <TouchableOpacity disabled={isConfirmDisabled} onPress={handleConfirmRound} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                               <Ionicons name="play" size={20} color={isConfirmDisabled ? "#999999" : "#34C759"} />
                             </TouchableOpacity>
                           ) : (
@@ -830,11 +854,11 @@ export default function GamePage() {
                     return (
                       <View key={`diff-${roundIndex}`} style={styles.roundCell}>
                         {isPlayingRow ? (
-                          <TouchableOpacity disabled={isConfirmDisabled} onPress={handleConfirmRound}>
+                          <TouchableOpacity disabled={isConfirmDisabled} onPress={handleConfirmRound} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                             <Ionicons name="play" size={20} color={isConfirmDisabled ? "#999999" : "#34C759"} />
                           </TouchableOpacity>
                         ) : isPreparingRow ? (
-                          <TouchableOpacity disabled={isNextRoundDisabled} onPress={handleNextRound}>
+                          <TouchableOpacity disabled={isNextRoundDisabled} onPress={handleNextRound} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                             <Ionicons name="play" size={20} color={isNextRoundDisabled ? "#999999" : "#34C759"} />
                           </TouchableOpacity>
                         ) : (
@@ -850,12 +874,12 @@ export default function GamePage() {
 
           {/* FIXED FOOTER - Back button */}
           <View style={styles.fixedFooter}>
-            <TouchableOpacity onPress={() => router.back()}>
+            <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
               <Text style={styles.backButton}>Back</Text>
             </TouchableOpacity>
 
             {true && (
-              <TouchableOpacity onPress={() => currentGame && addExtraRound(currentGame.id)}>
+              <TouchableOpacity onPress={() => currentGame && addExtraRound(currentGame.id)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <Text style={styles.addRoundText}>Add Round</Text>
               </TouchableOpacity>
             )}
@@ -866,7 +890,19 @@ export default function GamePage() {
       {/* Call Input Modal */}
       {/* Result Input Modal */}
       <CallInputModal visible={isResultModalVisible} onSelect={handleSelectResult} onClose={() => setResultModalVisible(false)} />
-      <CallInputModal visible={isModalVisible} onSelect={handleSelectCall} onClose={() => setModalVisible(false)} />
+      <CallInputModal
+        visible={isModalVisible}
+        onSelect={handleSelectCall}
+        onClose={() => setModalVisible(false)}
+        callerBid={
+          editingCell && currentGame
+            ? (() => {
+                const callerIndex = currentGame.isCaller[editingCell.roundIndex]?.findIndex((ic) => ic);
+                return callerIndex !== -1 ? currentGame.calls[editingCell.roundIndex][callerIndex] : null;
+              })()
+            : null
+        }
+      />
       <SuitSelectionModal visible={isSuitModalVisible} onSelect={handleSelectSuit} onClose={() => setSuitModalVisible(false)} />
     </View>
   );

@@ -40,7 +40,7 @@ export const SuitSelectionModal = ({ visible, onSelect, onClose }: SuitSelection
       <View style={styles.centeredView}>
         <View style={styles.modalView}>
           {/* Close button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
             <Text style={styles.closeButtonText}>×</Text>
           </TouchableOpacity>
 
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   modalView: {
     width: "50%",
     maxHeight: "50%",
-    backgroundColor: "#ffd4a3", // Sticky note color
+    backgroundColor: "#f5f5f0", // Sticky note color
     borderRadius: 4,
     padding: 15,
     shadowColor: "#000",

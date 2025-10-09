@@ -69,27 +69,27 @@ export default function GameSetupScreen() {
       {/* LEFT SIDEBAR - Action buttons */}
       <View style={styles.sidebar}>
         {/* Back button */}
-        <TouchableOpacity style={[styles.stickyNote, { top: 20 }]} onPress={() => router.back()}>
+        <TouchableOpacity style={[styles.stickyNote, { top: 20 }]} onPress={() => router.back()} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
           <Text style={styles.stickyText}>← Back</Text>
         </TouchableOpacity>
 
         {/* Create Classic game (18 rounds) */}
-        <TouchableOpacity style={[styles.stickyNote, { top: 90 }]} onPress={() => addGame("classic")}>
+        <TouchableOpacity style={[styles.stickyNote, { top: 90 }]} onPress={() => addGame("classic")} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
           <Text style={styles.stickyText}>Classic +</Text>
         </TouchableOpacity>
 
         {/* Create Mini game (10 rounds) */}
-        <TouchableOpacity style={[styles.stickyNote, { top: 160 }]} onPress={() => addGame("mini")}>
+        <TouchableOpacity style={[styles.stickyNote, { top: 160 }]} onPress={() => addGame("mini")} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
           <Text style={styles.stickyText}>Mini +</Text>
         </TouchableOpacity>
 
         {/* Create Micro game (5 rounds) */}
-        <TouchableOpacity style={[styles.stickyNote, { top: 230 }]} onPress={() => addGame("micro")}>
+        <TouchableOpacity style={[styles.stickyNote, { top: 230 }]} onPress={() => addGame("micro")} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
           <Text style={styles.stickyText}>Micro +</Text>
         </TouchableOpacity>
 
         {/* Toggle delete mode */}
-        <TouchableOpacity style={[styles.stickyNote, { top: 300 }, isDeleteMode ? styles.deleteNoteActive : styles.deleteNote]} onPress={() => setIsDeleteMode(!isDeleteMode)}>
+        <TouchableOpacity style={[styles.stickyNote, { top: 300 }, isDeleteMode ? styles.deleteNoteActive : styles.deleteNote]} onPress={() => setIsDeleteMode(!isDeleteMode)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
           <Text style={styles.stickyText}>{isDeleteMode ? "Cancel" : "Delete"}</Text>
         </TouchableOpacity>
       </View>

@@ -147,7 +147,7 @@ export default function LandingPage() {
       </View>
 
       {/* Settings sticky note - Top Right */}
-      <TouchableOpacity style={styles.settingsNote} onPress={() => {}} activeOpacity={0.7}>
+      <TouchableOpacity style={styles.settingsNote} onPress={() => {}} activeOpacity={0.7} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
         <Ionicons name="settings-outline" size={22} color="#5a5a5a" />
       </TouchableOpacity>
 
@@ -229,7 +229,7 @@ export default function LandingPage() {
           ]}
         >
           <Link href="/setup-normal" asChild>
-            <TouchableOpacity activeOpacity={0.9} style={{ width: "100%", height: "100%" }} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+            <TouchableOpacity activeOpacity={0.9} style={{ width: "100%", height: "100%" }} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
               <Text style={styles.stickyHeader}>Casual</Text>
               <View style={styles.divider} />
               <Text style={styles.stickyBullet}>• Classic</Text>

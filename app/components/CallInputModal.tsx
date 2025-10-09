@@ -7,13 +7,31 @@ type CallInputModalProps = {
   visible: boolean;
   onSelect: (call: number) => void;
   onClose: () => void;
+  currentRoundCalls?: (number | null)[]; // Calls made in the current round
+  callerBid?: number | null; // Add this - the caller's bid
 };
 
-export const CallInputModal = ({ visible, onSelect, onClose }: CallInputModalProps) => {
+export const CallInputModal = ({ visible, onSelect, onClose, currentRoundCalls, callerBid }: CallInputModalProps) => {
   // Load fonts
   const [fontsLoaded] = useFonts({
     Handlee_400Regular,
   });
+
+  // Check if a number should be disabled
+  const isDisabled = (call: number): boolean => {
+    // Only disable if a caller has been selected AND made a bid
+    if (callerBid === null || callerBid === undefined) return false;
+
+    // Disable numbers higher than caller's bid
+    return call > callerBid;
+  };
+
+  // Handle number press
+  const handleNumberPress = (call: number) => {
+    if (!isDisabled(call)) {
+      onSelect(call);
+    }
+  };
 
   if (!fontsLoaded) {
     return null;
@@ -24,7 +42,7 @@ export const CallInputModal = ({ visible, onSelect, onClose }: CallInputModalPro
       <View style={styles.centeredView}>
         <View style={styles.modalView}>
           {/* Close button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
             <Text style={styles.closeButtonText}>×</Text>
           </TouchableOpacity>
 
@@ -32,20 +50,26 @@ export const CallInputModal = ({ visible, onSelect, onClose }: CallInputModalPro
           <View style={styles.numbersContainer}>
             {/* First Row: 0 to 7 */}
             <View style={styles.row}>
-              {[0, 1, 2, 3, 4, 5, 6, 7].map((call) => (
-                <TouchableOpacity key={call} style={styles.numberButton} onPress={() => onSelect(call)}>
-                  <Text style={styles.numberText}>{call}</Text>
-                </TouchableOpacity>
-              ))}
+              {[0, 1, 2, 3, 4, 5, 6, 7].map((call) => {
+                const disabled = isDisabled(call);
+                return (
+                  <TouchableOpacity key={call} style={[styles.numberButton, disabled && styles.disabledButton]} onPress={() => handleNumberPress(call)} disabled={disabled} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                    <Text style={[styles.numberText, disabled && styles.disabledText]}>{call}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* Second Row: 8 to 13 */}
             <View style={styles.secondRow}>
-              {[8, 9, 10, 11, 12, 13].map((call) => (
-                <TouchableOpacity key={call} style={styles.numberButton} onPress={() => onSelect(call)}>
-                  <Text style={styles.numberText}>{call}</Text>
-                </TouchableOpacity>
-              ))}
+              {[8, 9, 10, 11, 12, 13].map((call) => {
+                const disabled = isDisabled(call);
+                return (
+                  <TouchableOpacity key={call} style={[styles.numberButton, disabled && styles.disabledButton]} onPress={() => handleNumberPress(call)} disabled={disabled} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                    <Text style={[styles.numberText, disabled && styles.disabledText]}>{call}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         </View>
@@ -63,7 +87,7 @@ const styles = StyleSheet.create({
   modalView: {
     width: "50%",
     maxHeight: "50%",
-    backgroundColor: "#ffd4a3", // Sticky note color
+    backgroundColor: "#f5f5f0", // Off-white background
     borderRadius: 4,
     padding: 15,
     shadowColor: "#000",
@@ -98,7 +122,6 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     justifyContent: "center",
-
     marginBottom: 10,
   },
   secondRow: {
@@ -114,9 +137,15 @@ const styles = StyleSheet.create({
     minWidth: 35,
     alignItems: "center",
   },
+  disabledButton: {
+    opacity: 1,
+  },
   numberText: {
     fontFamily: "Handlee_400Regular",
     fontSize: 28,
     color: "#333333",
+  },
+  disabledText: {
+    color: "#FF3B30", // Dark red color for disabled numbers
   },
 });

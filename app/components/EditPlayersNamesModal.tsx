@@ -75,10 +75,10 @@ export default function EditPlayerNamesModal({ visible, players, onSave, onClose
 
           {/* Action buttons */}
           <View style={styles.buttonsContainer}>
-            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCancel}>
+            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCancel} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSave}>
+            <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSave} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
               <Text style={styles.buttonText}>Save</Text>
             </TouchableOpacity>
           </View>
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: "50%",
     maxHeight: "60%",
-    backgroundColor: "#ffd4a3", // Sticky note yellow/orange
+    backgroundColor: "#f5f5f0", // Sticky note yellow/orange
     borderRadius: 4,
     padding: 20,
     shadowColor: "#000",
