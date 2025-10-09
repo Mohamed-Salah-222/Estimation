@@ -2,6 +2,10 @@ import { useGame } from "@/context/GameContext";
 import { useFonts } from "@expo-google-fonts/cairo";
 import { Handlee_400Regular } from "@expo-google-fonts/handlee";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
+import Foundation from "@expo/vector-icons/Foundation";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as NavigationBar from "expo-navigation-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -145,6 +149,12 @@ export default function GamePage() {
 
     if (callerBid === null || callerBid < maxBid) {
       return true; // Caller doesn't have the highest bid
+    }
+
+    // ⭐ NEW: Check if more than 2 players have DC
+    const dcCount = currentGame.isDashCall[currentRoundIndex]?.filter((isDC) => isDC).length || 0;
+    if (dcCount > 2) {
+      return true; // Cannot have more than 2 DC players
     }
 
     return false;
@@ -293,24 +303,83 @@ export default function GamePage() {
     setCurrentRound((prev) => prev + 1);
   };
 
+  const getMandatorySuitForRound = (roundNumber: number): string | null => {
+    switch (roundNumber) {
+      case 14:
+        return "suns";
+      case 15:
+        return "spades";
+      case 16:
+        return "hearts";
+      case 17:
+        return "diamonds";
+      case 18:
+        return "clubs";
+      default:
+        return null;
+    }
+  };
+
   const openCallerModal = (roundIndex: number, playerIndex: number) => {
     if (!currentGame) return;
 
+    const roundNumber = roundIndex + 1;
+    const isClassicMode = currentGame.mode === "classic";
+    const mandatorySuit = isClassicMode ? getMandatorySuitForRound(roundNumber) : null;
+
+    // Get player's current bid
+    const currentBid = currentGame.calls[roundIndex]?.[playerIndex];
+
+    // DEBUG LOGS
+    console.log("=== CALLER MODAL DEBUG ===");
+    console.log("Round Number:", roundNumber);
+    console.log("Is Classic Mode:", isClassicMode);
+    console.log("Mandatory Suit:", mandatorySuit);
+    console.log("Current Bid:", currentBid);
+    console.log("Should auto-set?", mandatorySuit && (currentBid === null || currentBid < 8));
+
+    // If it's a mandatory suit round AND bid is less than 8
+    if (mandatorySuit && (currentBid === null || currentBid < 8)) {
+      // Auto-set caller with mandatory suit (no modal, no bid correction)
+      console.log("✅ Auto-setting caller with mandatory suit:", mandatorySuit);
+      setCaller(currentGame.id, roundIndex, playerIndex, mandatorySuit);
+      return;
+    }
+
+    // Otherwise, open modal for suit selection
+    console.log("🎯 Opening modal for suit selection");
     setEditingCaller({ roundIndex, playerIndex });
     setSuitModalVisible(true);
   };
 
-  /**
-   * Handle caller suit selection
-   */
   const handleSelectSuit = (suit: string) => {
     if (editingCaller && currentGame) {
-      setCaller(currentGame.id, editingCaller.roundIndex, editingCaller.playerIndex, suit);
+      const { roundIndex, playerIndex } = editingCaller;
+
+      // Get current bid for this player
+      const currentBid = currentGame.calls[roundIndex]?.[playerIndex];
+
+      // Only auto-correct to 4 if NOT in a mandatory suit round
+      const roundNumber = roundIndex + 1;
+      const isClassicMode = currentGame.mode === "classic";
+      const mandatorySuit = isClassicMode ? getMandatorySuitForRound(roundNumber) : null;
+
+      if (!mandatorySuit) {
+        // Normal rounds: Check if bid needs auto-correction (null or < 4)
+        if (currentBid === null || currentBid < 4) {
+          // Auto-correct bid to 4
+          updateCall(currentGame.id, roundIndex, playerIndex, 4);
+        }
+      }
+      // Note: In mandatory rounds, we don't auto-correct the bid
+
+      // Set caller (this will automatically remove DC status via setCaller in context)
+      setCaller(currentGame.id, roundIndex, playerIndex, suit);
     }
+
     setSuitModalVisible(false);
     setEditingCaller(null);
   };
-
   /**
    * Mark current round as "playing" status
    */
@@ -433,10 +502,6 @@ export default function GamePage() {
     <View style={styles.container}>
       <StatusBar hidden={true} />
 
-      {/* Black edges on left and right */}
-      <View style={styles.leftEdge} />
-      <View style={styles.rightEdge} />
-
       {/* Notebook background lines */}
       {lines}
 
@@ -499,16 +564,16 @@ export default function GamePage() {
               {/* Round numbers column */}
               <View style={styles.roundColumn}>
                 {Array.from({ length: totalRounds + 1 }).map((_, roundIndex) => {
-                  // If this is the extra row (beyond totalRounds), check if we need ✗✗ here
+                  // If this is the extra row (beyond totalRounds), check if we need skull here
                   if (roundIndex >= totalRounds) {
-                    // Show ✗✗ if we're playing the last round
+                    // Show skull if we're playing the last round
                     const isPlayingLastRound = currentRound === totalRounds && currentGame.statuses[totalRounds - 1]?.[0] === "playing";
 
                     return (
                       <View key={`round-${roundIndex}`} style={styles.roundCell}>
                         {isPlayingLastRound ? (
                           <TouchableOpacity onPress={() => handleEveryoneLost(roundIndex)}>
-                            <Text style={styles.everyoneLostButton}>✗✗</Text>
+                            <Foundation name="skull" size={24} color="black" />
                           </TouchableOpacity>
                         ) : (
                           <Text style={styles.roundNumber}></Text>
@@ -525,18 +590,45 @@ export default function GamePage() {
                     : roundIndex + 1 === currentRound - 1; // If preparing, can click previous round number
                   const isStrikethrough = currentGame.everyoneLost[roundIndex];
 
+                  // Check if this is a mandatory suit round in classic mode (rounds 14-18)
+                  const isClassicMode = currentGame.mode === "classic";
+                  const roundNumber = roundIndex + 1;
+                  const isMandatorySuitRound = isClassicMode && roundNumber >= 14 && roundNumber <= 18;
+
+                  // Get mandatory suit symbol and color
+                  const getMandatorySuit = (round: number) => {
+                    switch (round) {
+                      case 14:
+                        return { symbol: "☀", color: "#FF9500" }; // Suns
+                      case 15:
+                        return { symbol: "♠", color: "#000000" }; // Spades
+                      case 16:
+                        return { symbol: "♥", color: "#FF3B30" }; // Hearts
+                      case 17:
+                        return { symbol: "♦", color: "#FF3B30" }; // Diamonds
+                      case 18:
+                        return { symbol: "♣", color: "#000000" }; // Clubs (Triffle)
+                      default:
+                        return null;
+                    }
+                  };
+
+                  const mandatorySuit = isMandatorySuitRound ? getMandatorySuit(roundNumber) : null;
+
                   return (
                     <View key={`round-${roundIndex}`} style={styles.roundCell}>
                       {isPlayingRow ? (
                         <TouchableOpacity onPress={() => handleEveryoneLost(roundIndex)}>
-                          <Text style={styles.everyoneLostButton}>✗✗</Text>
+                          <Foundation name="skull" size={24} color="black" />
                         </TouchableOpacity>
                       ) : isPreviousRound ? (
                         <TouchableOpacity onPress={() => handleUndoRound(roundIndex)}>
-                          <Text style={[styles.roundNumber, styles.clickableRoundNumber, isStrikethrough && styles.strikethroughText]}>{roundIndex + 1}</Text>
+                          <View style={styles.roundNumberCircle}>{mandatorySuit ? <Text style={[styles.mandatorySuitSymbol, { color: mandatorySuit.color }]}>{mandatorySuit.symbol}</Text> : <Text style={[styles.roundNumberInCircle, isStrikethrough && styles.strikethroughText]}>{roundNumber}</Text>}</View>
                         </TouchableOpacity>
+                      ) : mandatorySuit ? (
+                        <Text style={[styles.mandatorySuitSymbol, { color: mandatorySuit.color }, isStrikethrough && styles.strikethroughText]}>{mandatorySuit.symbol}</Text>
                       ) : (
-                        <Text style={[styles.roundNumber, isStrikethrough && styles.strikethroughText]}>{roundIndex + 1}</Text>
+                        <Text style={[styles.roundNumber, isStrikethrough && styles.strikethroughText]}>{roundNumber}</Text>
                       )}
                     </View>
                   );
@@ -562,7 +654,7 @@ export default function GamePage() {
                           {everyoneLostThisRound && <View style={styles.strikethrough} />}
                           {isCurrentRow && isPlayingRow ? (
                             <TouchableOpacity onPress={() => openResultModal(roundIndex, playerIndex)}>
-                              <Text style={styles.buttonTextSmall}>🔴</Text>
+                              <MaterialIcons name="cancel" size={24} color="red" />
                             </TouchableOpacity>
                           ) : isCurrentRow && !isPlayingRow ? (
                             <TouchableOpacity onPress={() => handleDashCall(roundIndex, playerIndex)}>
@@ -591,7 +683,7 @@ export default function GamePage() {
                             <Text style={styles.subColumnData}>{currentGame.results[roundIndex][playerIndex] ?? "..."}</Text>
                           ) : isCurrentRow && !isPlayingRow ? (
                             <TouchableOpacity onPress={() => openCallModal(roundIndex, playerIndex)}>
-                              <Text style={styles.subColumnData}>...</Text>
+                              <FontAwesome6 name="pencil" size={16} color="#333333" />
                             </TouchableOpacity>
                           ) : (
                             <Text style={styles.subColumnData}>{currentGame.statuses[roundIndex]?.[0] === "finished" ? currentGame.scores.slice(0, roundIndex + 1).reduce((total, round) => total + (round[playerIndex] || 0), 0) : null}</Text>
@@ -612,7 +704,7 @@ export default function GamePage() {
                           {currentGame.everyoneLost[roundIndex] && <View style={styles.strikethrough} />}
                           {isCurrentRow && isPlayingRow ? (
                             <TouchableOpacity onPress={() => handleWinClick(roundIndex, playerIndex)}>
-                              <Text style={styles.buttonTextSmall}>🟢</Text>
+                              <FontAwesome name="check-circle" size={24} color="green" />
                             </TouchableOpacity>
                           ) : isCurrentRow && !isPlayingRow ? (
                             <TouchableOpacity onPress={() => openCallerModal(roundIndex, playerIndex)}>
@@ -640,8 +732,39 @@ export default function GamePage() {
                       const isWith = !isCaller && !isDC && callerBid !== null && call === callerBid;
 
                       // Check if player is at Risk (player at position (caller + 3) % 4)
-                      const riskPlayerIndex = callerIndex !== -1 ? (callerIndex + 3) % 4 : -1;
-                      const isRisk = playerIndex === riskPlayerIndex && currentGame.roundDifferences[roundIndex] !== null && currentGame.roundDifferences[roundIndex] !== undefined && Math.abs(currentGame.roundDifferences[roundIndex]!) >= 2;
+                      let riskPlayerIndex = -1;
+                      if (callerIndex !== -1) {
+                        // Check positions in order: +3, +2, +1 from caller
+                        for (let offset = 3; offset >= 1; offset--) {
+                          const candidateIndex = (callerIndex + offset) % 4;
+                          const candidateIsDC = currentGame.isDashCall[roundIndex]?.[candidateIndex] ?? false;
+
+                          if (!candidateIsDC) {
+                            riskPlayerIndex = candidateIndex;
+                            break; // Found the furthest non-DC player
+                          }
+                        }
+                      }
+                      const roundDiff = currentGame.roundDifferences[roundIndex];
+                      const isRisk = playerIndex === riskPlayerIndex && roundDiff !== null && roundDiff !== undefined && Math.abs(roundDiff) >= 2;
+
+                      // Calculate risk multiplier for display
+                      let riskMultiplier = 0;
+                      if (isRisk && roundDiff !== null) {
+                        const absDiff = Math.abs(roundDiff);
+                        if (absDiff >= 8) {
+                          riskMultiplier = 4; // Quad risk: ±8 or ±9
+                        } else if (absDiff >= 6) {
+                          riskMultiplier = 3; // Triple risk: ±6 or ±7
+                        } else if (absDiff >= 4) {
+                          riskMultiplier = 2; // Double risk: ±4 or ±5
+                        } else if (absDiff >= 2) {
+                          riskMultiplier = 1; // Single risk: ±2 or ±3
+                        }
+                      }
+
+                      // Risk indicator text based on multiplier
+                      const riskIndicatorText = riskMultiplier > 1 ? `${riskMultiplier}R` : "R";
 
                       const displayCall = isDC ? "DC" : call;
 
@@ -660,7 +783,7 @@ export default function GamePage() {
                             </View>
                           ) : isRisk ? (
                             <View style={styles.callWithSuitContainer}>
-                              <Text style={styles.riskIndicator}>R</Text>
+                              <Text style={styles.riskIndicator}>{riskIndicatorText}</Text>
                               <Text style={styles.subColumnData}>{displayCall}</Text>
                             </View>
                           ) : (
@@ -1074,7 +1197,7 @@ const styles = StyleSheet.create({
   riskIndicator: {
     fontSize: 12,
 
-    color: "#FF9500", // Orange for "Risk"
+    color: "#ff0000ff", // Orange for "Risk"
     fontFamily: "Handlee_400Regular",
   },
   clickableRoundNumber: {
@@ -1096,5 +1219,25 @@ const styles = StyleSheet.create({
     fontFamily: "Handlee_400Regular",
     fontSize: 16,
     color: "#333333",
+  },
+  roundNumberCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#000000ff",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#E3F2FD",
+  },
+  roundNumberInCircle: {
+    fontFamily: "Handlee_400Regular",
+    fontSize: 14,
+    color: "#000000ff",
+  },
+  mandatorySuitSymbol: {
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });

@@ -28,9 +28,10 @@ type GameData = {
  * @param isOnlyWinner - Is this player the only winner in the round?
  * @param isOnlyLoser - Is this player the only loser in the round?
  * @param isWith - Did this player bid "with" (needs implementation based on your rules)
+ * @param riskMultiplier - Risk level multiplier (1x=10, 2x=20, 3x=30, 4x=40)
  * @returns Calculated score for the round
  */
-export function calculatePlayerScore(bid: number, result: number, isDash: boolean, isPositiveDash: boolean, isCaller: boolean, isRisk: boolean, isOnlyWinner: boolean, isOnlyLoser: boolean, isWith: boolean = false): number {
+export function calculatePlayerScore(bid: number, result: number, isDash: boolean, isPositiveDash: boolean, isCaller: boolean, isRisk: boolean, isOnlyWinner: boolean, isOnlyLoser: boolean, isWith: boolean = false, riskMultiplier: number = 0): number {
   const madeTheBid = bid === result;
   let score = 0;
 
@@ -94,9 +95,11 @@ export function calculatePlayerScore(bid: number, result: number, isDash: boolea
     score -= 10; // Only loser gets -10
   }
 
-  // 6. RISK BONUS
-  if (isRisk) {
-    score += madeTheBid ? 10 : -10;
+  // 6. RISK BONUS (with multiplier support)
+  // Risk tiers: ±2-3 = 1x, ±4-5 = 2x, ±6-7 = 3x, ±8-9 = 4x
+  if (isRisk && riskMultiplier > 0) {
+    const riskBonus = 10 * riskMultiplier;
+    score += madeTheBid ? riskBonus : -riskBonus;
   }
 
   return score;
@@ -152,10 +155,39 @@ export function calculateRoundScores(game: GameData, roundIndex: number) {
   const isRisk = roundDifference !== null && Math.abs(roundDifference) >= 2;
   const isPositiveDash = totalCalls > 13;
 
+  // Calculate risk multiplier based on round difference
+  // ±2-3 = 1x (10 points), ±4-5 = 2x (20 points), ±6-7 = 3x (30 points), ±8-9 = 4x (40 points)
+  let riskMultiplier = 0;
+  if (roundDifference !== null) {
+    const absDiff = Math.abs(roundDifference);
+    if (absDiff >= 8) {
+      riskMultiplier = 4; // Quad risk: ±8 or ±9
+    } else if (absDiff >= 6) {
+      riskMultiplier = 3; // Triple risk: ±6 or ±7
+    } else if (absDiff >= 4) {
+      riskMultiplier = 2; // Double risk: ±4 or ±5
+    } else if (absDiff >= 2) {
+      riskMultiplier = 1; // Single risk: ±2 or ±3
+    }
+  }
+
   // Determine which player is at risk (furthest from caller)
   // Pattern: (caller + 3) % 4
   const callerIndex = game.isCaller[roundIndex]?.findIndex((isCaller) => isCaller) ?? -1;
-  const riskPlayerIndex = callerIndex !== -1 ? (callerIndex + 3) % 4 : -1;
+  let riskPlayerIndex = -1;
+
+  if (callerIndex !== -1) {
+    // Check positions in order: +3, +2, +1 from caller
+    for (let offset = 3; offset >= 1; offset--) {
+      const candidateIndex = (callerIndex + offset) % 4;
+      const isDC = game.isDashCall?.[roundIndex]?.[candidateIndex] ?? false;
+
+      if (!isDC) {
+        riskPlayerIndex = candidateIndex;
+        break; // Found the furthest non-DC player
+      }
+    }
+  }
 
   // Determine winners and losers
   const winners: boolean[] = validCalls.map((call, idx) => call === validResults[idx]);
@@ -189,10 +221,10 @@ export function calculateRoundScores(game: GameData, roundIndex: number) {
     const playerIsOnlyWinner = isOnlyWinner && madeTheBid;
     const playerIsOnlyLoser = isOnlyLoser && !madeTheBid;
 
-    // Calculate base score
-    const baseScore = calculatePlayerScore(bid, result, isDash, isPositiveDash, isCaller, playerIsAtRisk, playerIsOnlyWinner, playerIsOnlyLoser, isWith);
+    // Calculate base score (with risk multiplier)
+    const baseScore = calculatePlayerScore(bid, result, isDash, isPositiveDash, isCaller, playerIsAtRisk, playerIsOnlyWinner, playerIsOnlyLoser, isWith, riskMultiplier);
 
-    // Apply multiplier
+    // Apply multiplier (from everyone lost / caller+2with)
     const score = baseScore * multiplier;
 
     roundScores.push(score);
