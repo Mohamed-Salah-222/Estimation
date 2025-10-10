@@ -14,6 +14,8 @@ type GameData = {
   statuses: ("preparing" | "playing" | "finished")[][];
   everyoneLost?: boolean[];
   isDashCall?: boolean[][];
+  manualRisk?: boolean[][]; // NEW
+  mode?: "classic" | "mini" | "micro"; // NEW
 };
 
 /**
@@ -171,20 +173,34 @@ export function calculateRoundScores(game: GameData, roundIndex: number) {
     }
   }
 
-  // Determine which player is at risk (furthest from caller)
-  // Pattern: (caller + 3) % 4
+  // Determine which player is at risk
   const callerIndex = game.isCaller[roundIndex]?.findIndex((isCaller) => isCaller) ?? -1;
   let riskPlayerIndex = -1;
 
-  if (callerIndex !== -1) {
-    // Check positions in order: +3, +2, +1 from caller
-    for (let offset = 3; offset >= 1; offset--) {
-      const candidateIndex = (callerIndex + offset) % 4;
-      const isDC = game.isDashCall?.[roundIndex]?.[candidateIndex] ?? false;
+  // Check if this is a mandatory round in classic mode (14-18)
+  const roundNumber = roundIndex + 1;
+  const isClassicMode = game.mode === "classic";
+  const isMandatoryRound = isClassicMode && roundNumber >= 14 && roundNumber <= 18;
 
-      if (!isDC) {
-        riskPlayerIndex = candidateIndex;
-        break; // Found the furthest non-DC player
+  if (isMandatoryRound) {
+    // In mandatory rounds (14-18), use manual risk only
+    const manualRiskIndex = game.manualRisk?.[roundIndex]?.findIndex((risk) => risk) ?? -1;
+    if (manualRiskIndex !== -1) {
+      riskPlayerIndex = manualRiskIndex;
+    }
+    // If no manual risk is set, riskPlayerIndex stays -1 (no risk player)
+  } else {
+    // In normal rounds (1-13, 19+), use automatic risk calculation
+    if (callerIndex !== -1) {
+      // Check positions in order: +3, +2, +1 from caller
+      for (let offset = 3; offset >= 1; offset--) {
+        const candidateIndex = (callerIndex + offset) % 4;
+        const isDC = game.isDashCall?.[roundIndex]?.[candidateIndex] ?? false;
+
+        if (!isDC) {
+          riskPlayerIndex = candidateIndex;
+          break; // Found the furthest non-DC player
+        }
       }
     }
   }

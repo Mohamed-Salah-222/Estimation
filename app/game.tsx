@@ -9,9 +9,10 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as NavigationBar from "expo-navigation-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Dimensions, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Dimensions, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { CallInputModal } from "./components/CallInputModal";
 import { SuitSelectionModal } from "./components/SuitSelectionModal";
+import WinnerModal from "./components/WinnerModal";
 
 const { width, height } = Dimensions.get("window");
 
@@ -35,6 +36,8 @@ export default function GamePage() {
   // ===== STATE =====
 
   // const [currentGame, setCurrentGame] = useState<Game | null>(null);
+  const [showWinnerModal, setShowWinnerModal] = useState(false);
+
   const [isModalVisible, setModalVisible] = useState(false);
   const [isResultModalVisible, setResultModalVisible] = useState(false);
   const [editingCell, setEditingCell] = useState<{ roundIndex: number; playerIndex: number } | null>(null);
@@ -62,6 +65,8 @@ export default function GamePage() {
     addExtraRound,
     undoRound,
     updatePlayerName,
+    setManualRisk,
+    clearManualRisk,
   } = useGame();
 
   // ===== FONTS =====
@@ -151,14 +156,97 @@ export default function GamePage() {
       return true; // Caller doesn't have the highest bid
     }
 
-    // ⭐ NEW: Check if more than 2 players have DC
+    // Check if more than 2 players have DC
     const dcCount = currentGame.isDashCall[currentRoundIndex]?.filter((isDC) => isDC).length || 0;
     if (dcCount > 2) {
       return true; // Cannot have more than 2 DC players
     }
 
+    // NEW: Check manual risk requirement in mandatory rounds (14-18)
+    const roundNumber = currentRound;
+    const isClassicMode = currentGame.mode === "classic";
+    const isMandatoryRound = isClassicMode && roundNumber >= 14 && roundNumber <= 18;
+
+    if (isMandatoryRound) {
+      const roundDiff = currentGame.roundDifferences[currentRoundIndex];
+      const hasManualRiskMarked = currentGame.manualRisk[currentRoundIndex]?.some((risk) => risk) ?? false;
+
+      // DEBUG LOGS
+      console.log("=== MANUAL RISK VALIDATION ===");
+      console.log("Round:", roundNumber);
+      console.log("Is Mandatory Round:", isMandatoryRound);
+      console.log("Round Diff:", roundDiff);
+      console.log("Has Manual Risk Marked:", hasManualRiskMarked);
+      console.log("Manual Risk Array:", currentGame.manualRisk[currentRoundIndex]);
+
+      // Must have round difference entered
+      if (roundDiff === null) {
+        console.log("❌ DISABLED: Round difference not entered yet");
+        return true; // Can't proceed without knowing the difference
+      }
+
+      // If game is ±2 or more, MUST have manual risk marked
+      if (Math.abs(roundDiff) >= 2) {
+        if (!hasManualRiskMarked) {
+          console.log("❌ DISABLED: Risk required but not marked");
+          return true; // Risk required but not marked
+        }
+      }
+
+      // If game is ±1 or 0, CANNOT have manual risk marked
+      if (Math.abs(roundDiff) < 2) {
+        if (hasManualRiskMarked) {
+          console.log("❌ DISABLED: Risk marked but shouldn't be");
+          return true; // Risk marked but shouldn't be
+        }
+      }
+
+      console.log("✅ Manual risk validation passed");
+    }
+
     return false;
   }, [allPlayersCalled, totalCalls, currentGame, currentRound, currentRoundCalls]);
+
+  const isGameFinished = useMemo(() => {
+    if (!currentGame) return false;
+
+    // Check if all rounds have been played (all statuses are "finished")
+    const allRoundsFinished = currentGame.statuses.every((roundStatuses) => roundStatuses.every((status) => status === "finished"));
+
+    return allRoundsFinished;
+  }, [currentGame?.statuses]);
+
+  // Add this function to calculate rankings:
+  const getRankings = useMemo(() => {
+    if (!currentGame) return [];
+
+    // Calculate final scores for each player
+    const finalScores = currentGame.players.map((playerName, playerIndex) => {
+      const totalScore = currentGame.scores.reduce((total, round) => total + (round[playerIndex] || 0), 0);
+
+      return {
+        playerName,
+        score: totalScore,
+        playerIndex,
+      };
+    });
+
+    // Sort by score (highest first)
+    finalScores.sort((a, b) => b.score - a.score);
+
+    // Add rank (1-4)
+    return finalScores.map((player, index) => ({
+      ...player,
+      rank: index + 1,
+    }));
+  }, [currentGame?.scores, currentGame?.players]);
+
+  // Add useEffect to auto-show modal when game finishes:
+  useEffect(() => {
+    if (isGameFinished) {
+      setShowWinnerModal(true);
+    }
+  }, [isGameFinished]);
 
   // Check if current round is in playing phase
   const isPlayingPhase = useMemo(() => {
@@ -192,6 +280,19 @@ export default function GamePage() {
       console.log("callerSuits:", currentGame.callerSuits[currentRound - 1]);
     }
   }, [currentGame?.isCaller, currentGame?.callerSuits, currentRound]);
+
+  useEffect(() => {
+    if (!currentGame || !allPlayersCalled) return;
+
+    const currentRoundIndex = currentRound - 1;
+    const existingDiff = currentGame.roundDifferences[currentRoundIndex];
+
+    // Only calculate if not already set and all calls are in
+    if (existingDiff === null && totalCalls !== 13) {
+      const difference = totalCalls - 13;
+      updateRoundDifference(currentGame.id, currentRoundIndex, difference);
+    }
+  }, [currentGame, allPlayersCalled, totalCalls, currentRound]);
 
   const totalRounds = currentGame?.calls?.length || 0;
 
@@ -393,6 +494,24 @@ export default function GamePage() {
     setDashCall(currentGame.id, roundIndex, playerIndex);
   };
 
+  const handleManualRiskToggle = (roundIndex: number, playerIndex: number) => {
+    if (!currentGame) return;
+
+    const currentlyHasRisk = currentGame.manualRisk[roundIndex]?.[playerIndex] ?? false;
+
+    console.log("=== TOGGLE MANUAL RISK ===");
+    console.log("Round Index:", roundIndex);
+    console.log("Player Index:", playerIndex);
+    console.log("Currently Has Risk:", currentlyHasRisk);
+    console.log("Before:", currentGame.manualRisk[roundIndex]);
+
+    if (currentlyHasRisk) {
+      clearManualRisk(currentGame.id, roundIndex);
+    } else {
+      setManualRisk(currentGame.id, roundIndex, playerIndex);
+    }
+  };
+
   /**
    * Handle "everyone lost" button click
    */
@@ -451,11 +570,22 @@ export default function GamePage() {
   const handleUndoRound = (roundIndex: number) => {
     if (!currentGame) return;
 
-    // Reset the round data
-    undoRound(currentGame.id, roundIndex);
-
-    // Go back to that round
-    setCurrentRound(roundIndex + 1); // +1 because currentRound is 1-based
+    Alert.alert("Edit Round", `Are you sure you want to reset Round ${roundIndex + 1}? All data for this round will be deleted.`, [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Edit",
+        style: "destructive",
+        onPress: () => {
+          // Reset the round data
+          undoRound(currentGame.id, roundIndex);
+          // Go back to that round
+          setCurrentRound(roundIndex + 1); // +1 because currentRound is 1-based
+        },
+      },
+    ]);
   };
 
   /**
@@ -668,6 +798,11 @@ export default function GamePage() {
                       const isWinner = currentGame.isWinner[roundIndex][playerIndex];
                       const everyoneLostThisRound = currentGame.everyoneLost[roundIndex];
 
+                      // Check if this is a mandatory suit round (14-18 in classic mode)
+                      const roundNumber = roundIndex + 1; // Convert to 1-based
+                      const isMandatorySuitRound = currentGame.mode === "classic" && roundNumber >= 14 && roundNumber <= 18;
+                      const hasManualRisk = currentGame.manualRisk[roundIndex]?.[playerIndex] ?? false;
+
                       return (
                         <View key={`p${playerIndex}-sub1-${roundIndex}`} style={styles.subCell}>
                           {everyoneLostThisRound && <View style={styles.strikethrough} />}
@@ -676,9 +811,17 @@ export default function GamePage() {
                               <MaterialIcons name="cancel" size={24} color="red" />
                             </TouchableOpacity>
                           ) : isCurrentRow && !isPlayingRow ? (
-                            <TouchableOpacity onPress={() => handleDashCall(roundIndex, playerIndex)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
-                              <Text style={styles.actionText}>DC</Text>
-                            </TouchableOpacity>
+                            isMandatorySuitRound ? (
+                              // Show R button for rounds 14-18 in classic mode (Manual Risk)
+                              <TouchableOpacity onPress={() => handleManualRiskToggle(roundIndex, playerIndex)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                                <Text style={[styles.actionText, hasManualRisk && styles.activeRisk]}>R</Text>
+                              </TouchableOpacity>
+                            ) : (
+                              // Show DC button for rounds 1-13 (and mini/micro modes)
+                              <TouchableOpacity onPress={() => handleDashCall(roundIndex, playerIndex)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                                <Text style={styles.actionText}>DC</Text>
+                              </TouchableOpacity>
+                            )
                           ) : isFinished ? (
                             <Text style={[styles.subColumnData, isWinner ? styles.winIndicator : styles.loseIndicator]}>{isWinner ? "✓" : "✗"}</Text>
                           ) : (
@@ -750,20 +893,36 @@ export default function GamePage() {
                       const callerBid = callerIndex !== -1 ? currentGame.calls[roundIndex]?.[callerIndex] : null;
                       const isWith = !isCaller && !isDC && callerBid !== null && call === callerBid;
 
-                      // Check if player is at Risk (player at position (caller + 3) % 4)
-                      let riskPlayerIndex = -1;
-                      if (callerIndex !== -1) {
-                        // Check positions in order: +3, +2, +1 from caller
-                        for (let offset = 3; offset >= 1; offset--) {
-                          const candidateIndex = (callerIndex + offset) % 4;
-                          const candidateIsDC = currentGame.isDashCall[roundIndex]?.[candidateIndex] ?? false;
+                      // Check if this is a mandatory round in classic mode (14-18)
+                      const roundNumber = roundIndex + 1;
+                      const isClassicMode = currentGame.mode === "classic";
+                      const isMandatoryRound = isClassicMode && roundNumber >= 14 && roundNumber <= 18;
 
-                          if (!candidateIsDC) {
-                            riskPlayerIndex = candidateIndex;
-                            break; // Found the furthest non-DC player
+                      // Determine risk player
+                      let riskPlayerIndex = -1;
+
+                      if (isMandatoryRound) {
+                        // In mandatory rounds (14-18), use manual risk only
+                        const manualRiskIndex = currentGame.manualRisk?.[roundIndex]?.findIndex((risk) => risk) ?? -1;
+                        if (manualRiskIndex !== -1) {
+                          riskPlayerIndex = manualRiskIndex;
+                        }
+                      } else {
+                        // In normal rounds (1-13, 19+), use automatic risk calculation
+                        if (callerIndex !== -1) {
+                          // Check positions in order: +3, +2, +1 from caller
+                          for (let offset = 3; offset >= 1; offset--) {
+                            const candidateIndex = (callerIndex + offset) % 4;
+                            const candidateIsDC = currentGame.isDashCall[roundIndex]?.[candidateIndex] ?? false;
+
+                            if (!candidateIsDC) {
+                              riskPlayerIndex = candidateIndex;
+                              break; // Found the furthest non-DC player
+                            }
                           }
                         }
                       }
+
                       const roundDiff = currentGame.roundDifferences[roundIndex];
                       const isRisk = playerIndex === riskPlayerIndex && roundDiff !== null && roundDiff !== undefined && Math.abs(roundDiff) >= 2;
 
@@ -878,7 +1037,7 @@ export default function GamePage() {
               <Text style={styles.backButton}>Back</Text>
             </TouchableOpacity>
 
-            {true && (
+            {currentGame && currentGame.currentRound === totalRounds && (
               <TouchableOpacity onPress={() => currentGame && addExtraRound(currentGame.id)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <Text style={styles.addRoundText}>Add Round</Text>
               </TouchableOpacity>
@@ -902,8 +1061,10 @@ export default function GamePage() {
               })()
             : null
         }
+        isPlayerCaller={editingCell && currentGame ? currentGame.isCaller[editingCell.roundIndex]?.[editingCell.playerIndex] ?? false : false}
       />
       <SuitSelectionModal visible={isSuitModalVisible} onSelect={handleSelectSuit} onClose={() => setSuitModalVisible(false)} />
+      <WinnerModal visible={showWinnerModal} rankings={getRankings} onClose={() => setShowWinnerModal(false)} />
     </View>
   );
 }
@@ -1275,5 +1436,19 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     textAlign: "center",
+  },
+  activeRisk: {
+    color: "#DC143C", // Crimson red to show it's selected
+    fontWeight: "bold",
+  },
+  manualRiskButton: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#666666",
+    textAlign: "center",
+  },
+  manualRiskButtonActive: {
+    color: "#FF3B30", // Red when active
+    fontWeight: "900",
   },
 });

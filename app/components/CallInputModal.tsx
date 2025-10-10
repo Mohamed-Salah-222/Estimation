@@ -7,18 +7,33 @@ type CallInputModalProps = {
   visible: boolean;
   onSelect: (call: number) => void;
   onClose: () => void;
-  currentRoundCalls?: (number | null)[]; // Calls made in the current round
-  callerBid?: number | null; // Add this - the caller's bid
+  currentRoundCalls?: (number | null)[];
+  callerBid?: number | null;
+  isPlayerCaller?: boolean; // ← This line should be there
 };
-
-export const CallInputModal = ({ visible, onSelect, onClose, currentRoundCalls, callerBid }: CallInputModalProps) => {
+export const CallInputModal = ({ visible, onSelect, onClose, currentRoundCalls, callerBid, isPlayerCaller }: CallInputModalProps) => {
   // Load fonts
   const [fontsLoaded] = useFonts({
     Handlee_400Regular,
   });
 
+  // Calculate the maximum call made in this round
+  const getMaxCall = (): number | null => {
+    if (!currentRoundCalls) return null;
+
+    const validCalls = currentRoundCalls.filter((call): call is number => call !== null);
+    if (validCalls.length === 0) return null;
+
+    return Math.max(...validCalls);
+  };
+
+  const maxCall = getMaxCall();
+
   // Check if a number should be disabled
   const isDisabled = (call: number): boolean => {
+    // If this player IS the caller, they can bid anything
+    if (isPlayerCaller) return false; // ← This line should be there
+
     // Only disable if a caller has been selected AND made a bid
     if (callerBid === null || callerBid === undefined) return false;
 
@@ -42,7 +57,7 @@ export const CallInputModal = ({ visible, onSelect, onClose, currentRoundCalls, 
       <View style={styles.centeredView}>
         <View style={styles.modalView}>
           {/* Close button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>×</Text>
           </TouchableOpacity>
 
@@ -53,7 +68,7 @@ export const CallInputModal = ({ visible, onSelect, onClose, currentRoundCalls, 
               {[0, 1, 2, 3, 4, 5, 6, 7].map((call) => {
                 const disabled = isDisabled(call);
                 return (
-                  <TouchableOpacity key={call} style={[styles.numberButton, disabled && styles.disabledButton]} onPress={() => handleNumberPress(call)} disabled={disabled} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                  <TouchableOpacity key={call} style={[styles.numberButton, disabled && styles.disabledButton]} onPress={() => handleNumberPress(call)} disabled={disabled}>
                     <Text style={[styles.numberText, disabled && styles.disabledText]}>{call}</Text>
                   </TouchableOpacity>
                 );
@@ -65,7 +80,7 @@ export const CallInputModal = ({ visible, onSelect, onClose, currentRoundCalls, 
               {[8, 9, 10, 11, 12, 13].map((call) => {
                 const disabled = isDisabled(call);
                 return (
-                  <TouchableOpacity key={call} style={[styles.numberButton, disabled && styles.disabledButton]} onPress={() => handleNumberPress(call)} disabled={disabled} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                  <TouchableOpacity key={call} style={[styles.numberButton, disabled && styles.disabledButton]} onPress={() => handleNumberPress(call)} disabled={disabled}>
                     <Text style={[styles.numberText, disabled && styles.disabledText]}>{call}</Text>
                   </TouchableOpacity>
                 );

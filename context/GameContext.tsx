@@ -36,6 +36,8 @@ export type Game = {
   // Round metadata (1D array: [roundIndex])
   roundDifferences: (number | null)[]; // Difference from 13 (for risk calculation)
   statuses: ("preparing" | "playing" | "finished")[][]; // Current status of each round
+
+  manualRisk: boolean[][];
 };
 
 /**
@@ -59,6 +61,8 @@ type GameContextType = {
   addExtraRound: (gameId: string) => void;
   undoRound: (gameId: string, roundIndex: number) => void;
   updatePlayerName: (gameId: string, playerIndex: number, name: string) => void;
+  setManualRisk: (gameId: string, roundIndex: number, playerIndex: number) => void;
+  clearManualRisk: (gameId: string, roundIndex: number) => void;
 };
 
 // ============================================================================
@@ -94,6 +98,7 @@ const initializeGameData = (mode: Game["mode"]) => {
     isDashCall: create2DArray(false),
     callerSuits: create2DArray(null),
     everyoneLost: Array(totalRounds).fill(false),
+    manualRisk: create2DArray(false), // NEW
   };
 };
 
@@ -357,7 +362,27 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
             everyoneLost: [...game.everyoneLost, false],
             roundDifferences: [...game.roundDifferences, null],
             statuses: [...game.statuses, ["preparing", "preparing", "preparing", "preparing"]],
+            manualRisk: [...game.manualRisk, [false, false, false, false]], // NEW
           };
+        }
+        return game;
+      })
+    );
+  };
+
+  const setManualRisk = (gameId: string, roundIndex: number, playerIndex: number) => {
+    setGames((prevGames) =>
+      prevGames.map((game) => {
+        if (game.id === gameId) {
+          // Set only this player as manual risk, unset others in this round
+          const newManualRisk = game.manualRisk.map((round, rIdx) => {
+            if (rIdx === roundIndex) {
+              return round.map((_, pIdx) => pIdx === playerIndex);
+            }
+            return round;
+          });
+
+          return { ...game, manualRisk: newManualRisk };
         }
         return game;
       })
@@ -371,35 +396,36 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     setGames((prevGames) =>
       prevGames.map((game) => {
         if (game.id === gameId) {
-          // Reset all data for this round
+          // Determine how many total rounds to clear (this round + all after it)
+          const totalRounds = game.calls.length;
+
+          // Reset all data for this round AND all subsequent rounds
           const newCalls = [...game.calls];
-          newCalls[roundIndex] = [null, null, null, null];
-
           const newResults = [...game.results];
-          newResults[roundIndex] = [null, null, null, null];
-
           const newScores = [...game.scores];
-          newScores[roundIndex] = [0, 0, 0, 0];
-
           const newIsWinner = [...game.isWinner];
-          newIsWinner[roundIndex] = [false, false, false, false];
-
           const newIsCaller = [...game.isCaller];
-          newIsCaller[roundIndex] = [false, false, false, false];
-
           const newIsDashCall = [...game.isDashCall];
-          newIsDashCall[roundIndex] = [false, false, false, false];
-
           const newCallerSuits = [...game.callerSuits];
-          newCallerSuits[roundIndex] = [null, null, null, null];
-
           const newEveryoneLost = [...game.everyoneLost];
-          newEveryoneLost[roundIndex] = false;
-
           const newRoundDifferences = [...game.roundDifferences];
-          newRoundDifferences[roundIndex] = null;
+          const newStatuses = [...game.statuses];
+          const newManualRisk = [...game.manualRisk]; // NEW
 
-          const newStatuses = game.statuses.map((row, idx) => (idx === roundIndex ? row.map(() => "preparing" as const) : row));
+          // Clear from roundIndex onwards
+          for (let i = roundIndex; i < totalRounds; i++) {
+            newCalls[i] = [null, null, null, null];
+            newResults[i] = [null, null, null, null];
+            newScores[i] = [0, 0, 0, 0];
+            newIsWinner[i] = [false, false, false, false];
+            newIsCaller[i] = [false, false, false, false];
+            newIsDashCall[i] = [false, false, false, false];
+            newCallerSuits[i] = [null, null, null, null];
+            newEveryoneLost[i] = false;
+            newRoundDifferences[i] = null;
+            newStatuses[i] = ["preparing", "preparing", "preparing", "preparing"];
+            newManualRisk[i] = [false, false, false, false]; // NEW
+          }
 
           return {
             ...game,
@@ -413,7 +439,27 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
             everyoneLost: newEveryoneLost,
             roundDifferences: newRoundDifferences,
             statuses: newStatuses,
+            manualRisk: newManualRisk, // NEW
           };
+        }
+        return game;
+      })
+    );
+  };
+
+  const clearManualRisk = (gameId: string, roundIndex: number) => {
+    setGames((prevGames) =>
+      prevGames.map((game) => {
+        if (game.id === gameId) {
+          // Clear all manual risk for this round
+          const newManualRisk = game.manualRisk.map((round, rIdx) => {
+            if (rIdx === roundIndex) {
+              return [false, false, false, false];
+            }
+            return round;
+          });
+
+          return { ...game, manualRisk: newManualRisk };
         }
         return game;
       })
@@ -498,6 +544,8 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     addExtraRound,
     undoRound,
     updatePlayerName,
+    setManualRisk,
+    clearManualRisk, // NEW
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

@@ -75,10 +75,10 @@ export default function EditPlayerNamesModal({ visible, players, onSave, onClose
 
           {/* Action buttons */}
           <View style={styles.buttonsContainer}>
-            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCancel} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCancel} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSave} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+            <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSave} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Text style={styles.buttonText}>Save</Text>
             </TouchableOpacity>
           </View>

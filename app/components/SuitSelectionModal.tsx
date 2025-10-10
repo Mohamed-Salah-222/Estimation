@@ -40,7 +40,7 @@ export const SuitSelectionModal = ({ visible, onSelect, onClose }: SuitSelection
       <View style={styles.centeredView}>
         <View style={styles.modalView}>
           {/* Close button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text style={styles.closeButtonText}>×</Text>
           </TouchableOpacity>
 
@@ -56,6 +56,7 @@ export const SuitSelectionModal = ({ visible, onSelect, onClose }: SuitSelection
                     onSelect(suit.value);
                     onClose();
                   }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Text style={[styles.suitSymbol, { color: getSuitColor(suit.value) }]}>{suit.symbol}</Text>
                 </TouchableOpacity>
